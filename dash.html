@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04070e">
+<title>Flatline Monitor</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one night sky fixed behind the page. A tower built from the last 24 hours of pings stands in it, and breaks into prisms on scroll. */
+:root{
+  color-scheme:dark;
+  --night:#04070e;--panel:rgba(6,10,18,.84);--line:rgba(214,226,244,.11);--line2:rgba(214,226,244,.24);
+  --fg:#eef1f4;--soft:#a4adba;--dim:#6d7684;--gold:#f2b866;--gold2:#ffdca0;--hot:#ff8d3f;--coral:#ff5a4f;--ice:#9cc6ff;--paper:#dde4e8;--ink:#10161d;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Menlo,monospace;
+  --a1:44,104,190;--a2:30,70,140;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--night)}
+body{margin:0;background:var(--night);color:var(--fg);font:15px/1.5 var(--sans);font-weight:400;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body[data-mood=warn]{--a1:150,92,40;--a2:70,60,110}
+body[data-mood=down]{--a1:150,36,36;--a2:80,24,50}
+body[data-mood=calm]{--a1:60,104,170;--a2:30,50,100}
+
+.sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(120% 90% at 70% 0,#0a1322 0,#04070e 62%)}
+.sky i{position:absolute;display:block;width:34vmax;height:120vmax;top:-30vmax;border-radius:50%;filter:blur(58px);background:linear-gradient(180deg,rgba(var(--a1),.62),rgba(var(--a2),.28) 55%,transparent);transition:background 1.4s;will-change:transform}
+.sky i:nth-child(1){left:18%;transform:rotate(24deg);animation:au1 19s ease-in-out infinite alternate}
+.sky i:nth-child(2){left:44%;width:20vmax;transform:rotate(-16deg);opacity:.7;animation:au2 25s ease-in-out infinite alternate}
+.sky i:nth-child(3){left:72%;width:26vmax;transform:rotate(31deg);opacity:.55;animation:au3 31s ease-in-out infinite alternate}
+@keyframes au1{to{transform:rotate(15deg) translateX(7vmax) scaleX(1.25)}}
+@keyframes au2{to{transform:rotate(-27deg) translateX(-6vmax) scaleX(.8)}}
+@keyframes au3{to{transform:rotate(22deg) translateX(5vmax) scaleX(1.2)}}
+#tower{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+
+.wrap{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+@media(min-width:760px){.wrap{padding-left:36px;padding-right:36px}}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--fg);text-decoration:none}
+.brand svg{display:block}
+.link{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid rgba(242,184,102,.5);font:10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--fg);white-space:nowrap;background:rgba(4,7,14,.5)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 9px var(--gold);animation:blink 2.2s infinite}
+.link[data-bad]{border-color:var(--coral)}
+.link[data-bad] .dot{background:var(--coral);box-shadow:0 0 9px var(--coral);animation:none}
+@keyframes blink{50%{opacity:.3}}
+
+.hero{display:flex;flex-direction:column;justify-content:flex-end;gap:20px;padding-top:calc(38svh);padding-bottom:30px}
+@media(min-width:900px){.hero{min-height:min(84svh,860px);padding-top:40px;padding-bottom:44px;max-width:52%}}
+h1{margin:0;font:300 clamp(40px,6.2vw,82px)/1.02 var(--sans);letter-spacing:-.035em;text-wrap:balance;overflow-wrap:anywhere}
+h1 em{font-style:normal;color:var(--gold);text-shadow:0 0 34px rgba(242,184,102,.45);transition:color .7s,text-shadow .7s}
+body[data-mood=warn] h1 em{color:var(--hot);text-shadow:0 0 34px rgba(255,141,63,.45)}
+body[data-mood=down] h1 em{color:var(--coral);text-shadow:0 0 38px rgba(255,90,79,.55)}
+body[data-mood=calm] h1 em{color:var(--ice);text-shadow:0 0 34px rgba(156,198,255,.4)}
+.sub{color:#c6ccd5;max-width:46ch;margin:0;font-weight:300}
+.herorow{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.tally{display:flex;gap:24px;font:10.5px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.tally b{display:block;font:300 26px/1.1 var(--sans);letter-spacing:-.02em;color:var(--fg);font-variant-numeric:tabular-nums;margin-bottom:4px}
+.watch{display:flex;flex-wrap:wrap;gap:6px}
+.watch button{height:36px;padding:0 12px;font:11px/1 var(--mono);max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.watch button[aria-pressed=true]{border-color:var(--gold);color:var(--gold2)}
+.legend{font:11px/1.45 var(--mono);color:var(--soft);max-width:46ch}
+
+.banner{display:none;margin:0 0 14px;padding:12px 16px;border:1px solid var(--coral);background:var(--panel);font-size:14px}
+.banner[data-on]{display:block}
+
+.grid{display:grid;gap:14px}
+@media(min-width:1040px){.grid{grid-template-columns:minmax(0,1fr) 340px;align-items:start}.feed{position:sticky;top:18px}}
+.stack{display:grid;gap:14px;min-width:0}
+
+.card{position:relative;background:var(--panel);border:1px solid var(--line);opacity:0;transform:translateY(16px);animation:rise .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d,0s);transition:border-color .5s,box-shadow .5s;min-width:0}
+@keyframes rise{to{opacity:1;transform:none}}
+.bot::before{content:"";position:absolute;left:-1px;top:-1px;width:14px;height:14px;border-left:1px solid var(--gold);border-top:1px solid var(--gold);transition:border-color .5s}
+.bot::after{content:"";position:absolute;right:-1px;bottom:-1px;width:14px;height:14px;border-right:1px solid var(--gold);border-bottom:1px solid var(--gold);transition:border-color .5s}
+.bot[data-state=down],.bot[data-state=killing]{border-color:rgba(255,90,79,.55);box-shadow:0 0 50px -16px rgba(255,90,79,.6)}
+.bot[data-state=down]::before,.bot[data-state=down]::after,.bot[data-state=killing]::before,.bot[data-state=killing]::after{border-color:var(--coral)}
+.bot[data-state=warn]{border-color:rgba(255,141,63,.45);box-shadow:0 0 44px -18px rgba(255,141,63,.55)}
+.bot[data-state=warn]::before,.bot[data-state=warn]::after{border-color:var(--hot)}
+.bot[data-state=halted]{border-color:rgba(156,198,255,.38)}
+.bot[data-state=halted]::before,.bot[data-state=halted]::after{border-color:var(--ice)}
+
+.bothead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 0}
+.name{font:400 14px/1.2 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pill{flex:none;display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid rgba(242,184,102,.45);font:400 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--gold2)}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+[data-state=warn] .pill{border-color:rgba(255,141,63,.6);color:var(--hot)}
+[data-state=down] .pill,[data-state=killing] .pill{border-color:rgba(255,90,79,.7);color:var(--coral)}
+[data-state=down] .pill::before,[data-state=killing] .pill::before{animation:blink .7s infinite}
+[data-state=halted] .pill{border-color:rgba(156,198,255,.5);color:var(--ice)}
+[data-state=paused] .pill,[data-state=waiting] .pill{border-color:var(--line2);color:var(--soft)}
+
+.scope{position:relative;height:104px;margin-top:6px}
+@media(min-width:760px){.scope{height:124px}}
+.scope canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.scope .since{position:absolute;right:16px;top:6px;font:10.5px/1 var(--mono);color:var(--soft);font-variant-numeric:tabular-nums}
+
+.vitals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
+.v{padding:12px 16px;border-left:1px solid var(--line);min-width:0}
+.v:first-child{border-left:0}
+.v small{display:block;font:10.5px/1.2 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--soft);white-space:nowrap}
+.v strong{display:block;margin-top:6px;font:300 clamp(19px,2.7vw,27px)/1.1 var(--sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .4s}
+.v .lim{display:block;margin-top:4px;font:10.5px/1.2 var(--mono);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v[data-bad] strong{color:var(--coral)}
+
+.strip{padding:12px 16px 14px;border-top:1px solid var(--line)}
+.striphead{display:flex;justify-content:space-between;gap:10px;font:10.5px/1.2 var(--mono);color:var(--soft);margin-bottom:8px}
+.cells{display:grid;grid-template-columns:repeat(96,minmax(0,1fr));gap:1px;height:16px}
+.cells i{background:rgba(214,226,244,.06)}
+.cells i.on{background:var(--gold);opacity:.8}
+.cells i.off{background:var(--coral)}
+
+.killbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);font:11.5px/1.3 var(--mono);color:var(--soft)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tag{padding:3px 7px;border:1px solid var(--line2);color:var(--fg);font-size:10.5px}
+.conn{display:inline-flex;align-items:center;gap:6px}
+.conn i{width:5px;height:5px;border-radius:50%;background:var(--dim)}
+.conn[data-on] i{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.steps{display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:14px 16px 16px;border-top:1px solid var(--line);position:relative}
+.steps[data-on]{display:grid;animation:fade .4s}
+.step{position:relative;padding-top:18px;font:10.5px/1.25 var(--mono);color:var(--soft);transition:color .4s;min-width:0;padding-right:6px}
+.step::before{content:"";position:absolute;top:3px;left:0;width:9px;height:9px;background:var(--night);border:1px solid var(--dim);transform:rotate(45deg);transition:all .4s;z-index:1}
+.step::after{content:"";position:absolute;top:7px;left:9px;right:0;height:1px;background:linear-gradient(90deg,var(--ice) 50%,var(--line2) 50%);background-size:200% 100%;background-position:100% 0;transition:background-position .7s}
+.step:last-child::after{display:none}
+.step[data-s=on]{color:var(--fg)}
+.step[data-s=on]::before{background:var(--ice);border-color:var(--ice);box-shadow:0 0 12px var(--ice)}
+.step[data-s=on]::after{background-position:0 0}
+.step[data-s=now]{color:var(--fg)}
+.step[data-s=now]::before{border-color:var(--coral);background:var(--coral);animation:blink .7s infinite}
+.step[data-s=bad]{color:var(--coral)}
+.step[data-s=bad]::before{background:var(--coral);border-color:var(--coral)}
+
+.crash{display:grid;grid-template-rows:0fr;transition:grid-template-rows .55s cubic-bezier(.2,.8,.2,1);border-top:0 solid var(--line)}
+.crash[data-on]{grid-template-rows:1fr;border-top-width:1px}
+.crash>div{overflow:hidden;min-height:0}
+.cause{padding:14px 16px 4px;font:300 clamp(20px,2.8vw,28px)/1.18 var(--sans);letter-spacing:-.02em;color:var(--fg)}
+.cause span{display:block;margin-bottom:7px;font:10.5px/1 var(--mono);letter-spacing:.1em;color:var(--coral);text-transform:uppercase}
+.log{margin:8px 16px 16px;padding:11px 12px;background:rgba(0,0,0,.6);border:1px solid var(--line);font:11.5px/1.55 var(--mono);color:#b9c0ca;white-space:pre-wrap;overflow-wrap:anywhere;max-height:190px;overflow:auto}
+.log div{animation:line .32s both}
+.log div:last-child{color:var(--coral)}
+@keyframes line{from{opacity:0;transform:translateX(-6px)}}
+@keyframes fade{from{opacity:0}}
+
+.feedhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);font:10.5px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.events{max-height:560px;overflow:auto;display:grid;align-content:start;min-height:110px}
+.ev{padding:12px 16px 12px 28px;position:relative;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:300;line-height:1.42;overflow-wrap:anywhere;animation:pop .5s cubic-bezier(.2,1,.3,1) both}
+.ev::before{content:"";position:absolute;left:14px;top:18px;width:6px;height:6px;transform:rotate(45deg);background:var(--gold)}
+.ev[data-k=bad]::before{background:var(--coral);box-shadow:0 0 9px var(--coral)}
+.ev[data-k=warn]::before{background:var(--hot)}
+.ev[data-k=kill]::before{background:var(--ice);box-shadow:0 0 9px var(--ice)}
+.ev time{display:block;margin-top:5px;font:10px/1 var(--mono);color:var(--soft)}
+@keyframes pop{from{opacity:0;transform:translateY(-8px)}}
+.none{padding:24px 16px;color:var(--soft);text-align:center;font-size:13px}
+
+.empty{padding:34px 22px;text-align:center}
+.empty h2{margin:0 0 8px;font:300 30px/1.1 var(--sans);letter-spacing:-.02em}
+.empty p{margin:0;color:var(--soft)}
+code{font:12.5px var(--mono);color:var(--gold2)}
+
+.console{position:fixed;left:0;right:0;bottom:0;z-index:5;display:none;padding:9px max(12px,env(safe-area-inset-right,0px)) calc(9px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left,0px));background:rgba(4,7,14,.93);border-top:1px solid var(--line2)}
+.console[data-on]{display:block}
+.console>div{max-width:1248px;margin:auto;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none}
+.console>div::-webkit-scrollbar{display:none}
+.console span{flex:none;font:10.5px/1.25 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin-right:6px}
+button{flex:none;appearance:none;border:1px solid var(--line2);background:transparent;color:var(--fg);font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:0 14px;height:44px;border-radius:0;cursor:pointer;transition:transform .15s,background .2s,border-color .2s,color .2s;white-space:nowrap}
+button:hover{border-color:var(--gold);color:var(--gold2)}
+button:active{transform:scale(.97)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button[data-danger]{color:#ff8a80;border-color:rgba(255,90,79,.55)}
+button[data-primary]{border-color:var(--gold);color:var(--gold2)}
+.sim{display:none;font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink);background:var(--gold);padding:4px 6px}
+[data-mode=demo] .sim{display:inline-block}
+.cta{flex:none;display:none;align-items:center;justify-content:center;height:44px;padding:0 16px;background:var(--gold);color:var(--ink);font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;text-decoration:none;white-space:nowrap}
+[data-mode=demo] .cta{display:inline-flex}
+
+.how{display:none;position:relative;z-index:1;background:var(--paper);color:var(--ink);padding:72px max(16px,env(safe-area-inset-right,0px)) 112px max(16px,env(safe-area-inset-left,0px));margin-top:48px}
+[data-mode=demo] .how{display:block}
+.how>div{max-width:1248px;margin:auto}
+.how h2{margin:0 0 34px;font:300 clamp(34px,5vw,60px)/1.04 var(--sans);letter-spacing:-.03em}
+.how ul{list-style:none;margin:0;padding:0;display:grid;gap:26px}
+@media(min-width:760px){.how ul{grid-template-columns:repeat(3,1fr);gap:36px}}
+.how li{border-top:1px solid rgba(16,22,29,.28);padding-top:16px}
+.how b{display:block;font:400 18px/1.25 var(--sans);letter-spacing:-.01em;margin-bottom:6px}
+.how p{margin:0;color:#3f4a56;font-size:14.5px}
+.how small{display:block;margin-top:40px;font:11px/1.55 var(--mono);color:#505b67;max-width:80ch}
+footer{margin-top:18px;font:11px/1.5 var(--mono);color:var(--soft)}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .card{opacity:1;transform:none}
+}
+</style>
+</head>
+<body data-mood="ok" data-mode="live">
+<div class="sky" aria-hidden="true"><i></i><i></i><i></i></div>
+<canvas id="tower" aria-hidden="true"></canvas>
+<div class="wrap">
+  <header>
+    <a class="brand" href="#" aria-label="Flatline Watchdog">
+      <svg width="30" height="18" viewBox="0 0 30 18" fill="none" aria-hidden="true"><path d="M1 10h7l2.5-7 4 14 3-10 1.5 3H29" stroke="#f2b866" stroke-width="1.2" stroke-linejoin="miter"/></svg>
+      Flatline <span class="sim">Simulated</span>
+    </a>
+    <div class="link" id="link" role="status"><span class="dot"></span><span id="linktext">Connecting</span></div>
+  </header>
+
+  <section class="hero">
+    <h1 id="headline">Listening&hellip;</h1>
+    <p class="sub" id="sub"></p>
+    <div class="herorow"><div class="tally" id="tally"></div><div class="watch" id="watch"></div></div>
+    <p class="legend sub" id="legend"></p>
+  </section>
+
+  <div class="banner" id="banner" role="alert"></div>
+
+  <div class="grid">
+    <div class="stack" id="bots"></div>
+    <aside class="card feed" style="--d:.25s">
+      <div class="feedhead"><span id="feedtitle">Alerts sent to Telegram</span><span id="evcount"></span></div>
+      <div class="events" id="events" aria-live="polite"></div>
+    </aside>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<section class="how" aria-label="How it works"><div>
+  <h2>What happens when<br>your bot fails.</h2>
+  <ul>
+    <li><b>One command to start</b><p>Start your bot through the Flatline agent. It needs no exchange keys and opens no ports.</p></li>
+    <li><b>The reason comes with the alert</b><p>A crash alert includes the likely cause and the bot's last log lines, with keys and tokens hidden first.</p></li>
+    <li><b>A switch you control</b><p>Stop the bot from Telegram, or choose which alerts stop it. Your own clean-up command then runs.</p></li>
+  </ul>
+  <small id="demofoot"></small>
+</div></section>
+
+<div class="console" id="console"><div>
+  <span>Try it</span>
+  <button data-act="crash" data-danger>Crash it</button>
+  <button data-act="freeze">Freeze it</button>
+  <button data-act="loss">Cross loss limit</button>
+  <button data-act="kill" data-danger>Kill switch</button>
+  <button data-act="reset" data-primary>Restart</button>
+  <a class="cta" href="https://github.com/Savi7037/flatline-watchdog" rel="noopener">Get it free on GitHub</a>
+</div></div>
+
+<script>
+"use strict";
+const DEMO = !/\/dash\//.test(location.pathname);
+const DATA_URL = DEMO ? null : location.pathname.replace(/\/+$/,"") + "/data";
+const CALM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+const COL = {ok:[242,184,102], warn:[255,141,63], down:[255,90,79], killing:[255,90,79], halted:[156,198,255], paused:[109,118,132], waiting:[109,118,132]};
+const LABEL = {ok:"Alive", warn:"Needs a look", down:"Flatlined", killing:"Stopping", halted:"Stopped", paused:"Paused", waiting:"Waiting for ping"};
+document.body.dataset.mode = DEMO ? "demo" : "live";
+
+/* ---------- the monitor trace: a real sweep with an erase gap, like a bedside monitor ---------- */
+class Scope {
+  constructor(canvas){ this.c = canvas; this.ctx = canvas.getContext("2d"); this.x = 0; this.ys = []; this.t = 0; this.next = .4; this.beat = -1; this.state = "ok"; this.gain = 1; this.mix = [...COL.ok]; this.fit(); }
+  fit(){
+    const r = this.c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+    if (!r.width) return;
+    this.w = r.width; this.h = r.height; this.c.width = r.width * d; this.c.height = r.height * d; this.ctx.setTransform(d,0,0,d,0,0);
+    const n = Math.ceil(r.width); if (this.ys.length !== n) { this.ys = new Array(n).fill(0); this.x = 0; }
+    if (CALM) this.still();
+  }
+  /* one heartbeat, shaped P-QRS-T. p runs 0..1 */
+  wave(p){
+    const g = (c,w,a) => a * Math.exp(-((p-c)*(p-c)) / (2*w*w));
+    return g(.14,.028,.13) + g(.27,.009,-.16) + g(.3,.011,1) + g(.335,.01,-.3) + g(.56,.05,.25);
+  }
+  sample(dt){
+    const alive = this.state === "ok" || this.state === "warn";
+    this.t += dt;
+    if (alive && this.t >= this.next) {
+      this.beat = 0;
+      this.next = this.t + (this.state === "warn" ? .52 + Math.random()*.55 : .86 + Math.random()*.08);
+    }
+    let v = 0;
+    if (this.beat >= 0) { v = this.wave(this.beat) * this.gain * (this.state === "warn" ? .78 : 1); this.beat += dt / .72; if (this.beat > 1) this.beat = -1; }
+    if (!alive && this.state !== "paused" && this.state !== "waiting") v += (Math.random()-.5) * .007;
+    return v + (alive ? (Math.random()-.5) * .006 : 0);
+  }
+  /* gain falls as a ping gets older, so a weakening trace really is a bot getting late */
+  set(state, age, timeout){
+    if (state !== this.state) { if ((state === "ok" || state === "warn") && this.state !== "warn" && this.state !== "ok") this.next = this.t + .1; this.state = state; }
+    this.gain = age == null ? 1 : Math.max(.3, 1 - .7 * Math.min(1, age / Math.max(timeout,1)));
+  }
+  tick(dt){
+    if (!this.w) return this.fit();
+    const speed = Math.min(150, this.w / 6.5), steps = Math.max(1, Math.round(speed * dt));
+    for (let i = 0; i < steps; i++) { this.x = (this.x + 1) % this.ys.length; this.ys[this.x] = this.sample(dt / steps); }
+    const tgt = COL[this.state] || COL.ok; for (let i = 0; i < 3; i++) this.mix[i] += (tgt[i] - this.mix[i]) * Math.min(1, dt * 3);
+    this.draw();
+  }
+  draw(){
+    const {ctx, w, h, ys, x} = this, base = h * .68, amp = h * .56, gap = 26, c = this.mix.map(Math.round).join(",");
+    ctx.clearRect(0,0,w,h);
+    const trace = (from, to) => {
+      ctx.beginPath(); let pen = false;
+      for (let i = from; i <= to; i++) { const y = base - ys[i] * amp; pen ? ctx.lineTo(i, y) : ctx.moveTo(i, y); pen = true; }
+      ctx.stroke();
+    };
+    /* older ink fades, newest is brightest */
+    const n = ys.length, parts = [[x + gap + 1, n - 1, .34],[0, Math.max(0, x - Math.floor(n * .34)), .34 + (x / n) * .2],[Math.max(0, x - Math.floor(n * .34)), x, 1]];
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (const [a,b,alpha] of parts) { if (b <= a) continue;
+      ctx.strokeStyle = `rgba(${c},${alpha * .18})`; ctx.lineWidth = 7; trace(a,b);
+      ctx.strokeStyle = `rgba(${c},${alpha})`; ctx.lineWidth = 1.7; trace(a,b);
+    }
+    if (!CALM) { const y = base - ys[x] * amp;
+      const g = ctx.createRadialGradient(x,y,0,x,y,15); g.addColorStop(0,`rgba(${c},.85)`); g.addColorStop(1,`rgba(${c},0)`);
+      ctx.fillStyle = g; ctx.fillRect(x-15,y-15,30,30); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x,y,1.9,0,7); ctx.fill(); }
+  }
+  still(){ for (let i = 0; i < this.ys.length; i++) { this.ys[i] = this.sample(.009); } this.x = this.ys.length - 1; this.draw(); }
+}
+
+/* ---------- the tower: 96 blocks, one for each 15 minutes of the last 24 hours, oldest at the bottom ---------- */
+const PRISM = [[156,198,255],[120,235,226],[226,170,255],[255,220,170],[190,215,255]];
+const lerp = (a,b,t) => a + (b-a)*t;
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const smooth = x => { x = clamp01(x); return x*x*(3-2*x); };
+class Tower {
+  constructor(canvas){
+    this.c = canvas; this.ctx = canvas.getContext("2d"); this.t = 0; this.yaw = .6; this.state = "waiting"; this.since = 0; this.scroll = 0; this.waveAt = -9; this.beats = new Array(96).fill(-1);
+    const ring = [[-1.5,-1.5],[-.5,-1.5],[.5,-1.5],[1.5,-1.5],[1.5,-.5],[1.5,.5],[1.5,1.5],[.5,1.5],[-.5,1.5],[-1.5,1.5],[-1.5,.5],[-1.5,-.5]], R = Math.random;
+    this.cubes = [];
+    for (let f = 0; f < 8; f++) for (let k = 0; k < 12; k++) { const [x,z] = ring[k], i = f*12+k;
+      const a = R()*6.283, r = .5+R()*.5;
+      this.cubes.push({i, f, hx:x*1.22, hy:(f-3.5)*1.22, hz:z*1.22, ex:Math.cos(a)*r*5, ey:(R()-.62)*7, ez:Math.sin(a)*r*5,
+        sx:(R()-.5)*2, sy:(R()-.5)*2, sz:R(), rx:R()*6.3, ry:R()*6.3, wx:(R()-.5)*1.4, wy:(R()-.5)*1.4, ph:R()*6.3,
+        dis:0, col:[109,118,132], b:.05, a:.1, hue:PRISM[i%PRISM.length], depth:0}); }
+    this.stars = []; for (let i = 0; i < 140; i++) this.stars.push([R(),R(),.3+R()*1.1,R()*6.3,.2+R()*.8]);
+    this.sprites = {}; for (const [k,c] of Object.entries(COL)) { const n = document.createElement("canvas"); n.width = n.height = 64; const g = n.getContext("2d"), r = g.createRadialGradient(32,32,0,32,32,32);
+      r.addColorStop(0,`rgba(${c},.75)`); r.addColorStop(.4,`rgba(${c},.2)`); r.addColorStop(1,`rgba(${c},0)`); g.fillStyle = r; g.fillRect(0,0,64,64); this.sprites[k] = n; }
+    this.fit();
+  }
+  fit(){
+    const W = innerWidth, H = innerHeight;
+    if (W === this.w && Math.abs(H - this.h) < 120) return;
+    const d = Math.min(devicePixelRatio || 1, 1.75);
+    this.w = W; this.h = H; this.c.width = W*d; this.c.height = H*d; this.ctx.setTransform(d,0,0,d,0,0);
+    this.wide = W >= 900; this.u = (this.wide ? H*.62 : Math.min(H*.3, W*.62)) / 10; this.count = W < 700 ? 70 : 140;
+    if (CALM) this.draw();
+  }
+  set(beats, state){
+    if (beats) this.beats = beats;
+    if (state !== this.state) { this.state = state; this.since = this.t; }
+  }
+  pulse(){ this.waveAt = this.t; }
+  look(c){
+    const n = this.beats[c.i], s = this.state, flick = Math.sin(this.t*17+c.ph)*Math.sin(this.t*7.3+c.ph*2);
+    if (s === "paused" || s === "waiting") return [COL.paused, n > 0 ? .1 : .03, n < 0 ? .12 : .4];
+    if (s === "halted") return [COL.halted, n > 0 ? .2 : .06, n < 0 ? .16 : .6];
+    if (s === "down" || s === "killing") return [COL.down, .3 + Math.max(0,flick)*.55, n < 0 ? .35 : 1];
+    if (n < 0) return [COL.paused, 0, .13];
+    if (n === 0) return [COL.down, .85, 1];
+    if (s === "warn") return [COL.warn, .45 + flick*.3, 1];
+    return [COL.ok, .62, 1];
+  }
+  frame(dt){
+    this.t += dt;
+    const spinning = this.state !== "halted" && this.state !== "paused";
+    this.yaw += dt * (spinning ? .13 : .03);
+    const age = this.t - this.since, want = this.state === "down" ? 1 : this.state === "killing" ? .34 : 0;
+    for (const c of this.cubes) {
+      const lag = (7 - c.f) * .1 + (c.i % 12) * .012;
+      if (want === 0 || age > lag) c.dis += (want - c.dis) * Math.min(1, dt * (want > c.dis ? 1.5 : 2.4));
+      const [col,b,a] = this.look(c), k = Math.min(1, dt * (age > lag ? 3.2 : .4));
+      for (let j = 0; j < 3; j++) c.col[j] += (col[j] - c.col[j]) * k;
+      c.b += (b - c.b) * k; c.a += (a - c.a) * Math.max(k, Math.min(1, dt*2.5));
+    }
+    this.draw();
+  }
+  draw(){
+    const {ctx, w:W, h:H, u} = this; if (!W) return;
+    ctx.clearRect(0,0,W,H);
+    const s = this.scroll, spread = smooth(s*1.15), T = this.t;
+    /* stars */
+    ctx.fillStyle = "#dfe9ff";
+    for (let i = 0; i < this.count; i++) { const st = this.stars[i], x = ((st[0] + T*.0016*st[4]) % 1) * W, y = (st[1]*H - s*st[4]*H*.08 + H) % H;
+      ctx.globalAlpha = (.28 + .5*(.5+.5*Math.sin(T*st[4]*1.5+st[3]))) * st[4]; ctx.fillRect(x,y,st[2],st[2]); }
+    ctx.globalAlpha = 1;
+    const cx = this.wide ? lerp(W*.74, W*.82, spread) : W*.5, cy = (this.wide ? H*.47 : H*.235) - s*H*.1, F = u*34;
+    const cy0 = Math.cos(this.yaw), sy0 = Math.sin(this.yaw), tilt = -.13, ct = Math.cos(tilt), st0 = Math.sin(tilt), lean = -.07, cl = Math.cos(lean), sl = Math.sin(lean);
+    const toCam = (x,y,z) => { const X = x*cy0 + z*sy0, Z0 = -x*sy0 + z*cy0, Y = y*ct - Z0*st0, Z = y*st0 + Z0*ct; return [X*cl - Y*sl, X*sl + Y*cl, Z]; };
+    const wave = (T - this.waveAt) * 7, idle = (T*1.4) % 14 - 3, alive = this.state === "ok" || this.state === "warn";
+    const swarmW = (this.wide ? W*.34 : W*.62) / u, swarmH = H*.62 / u;
+    /* place each block */
+    for (const c of this.cubes) {
+      const fl = Math.sin(T*.6 + c.ph), d = c.dis, m = Math.max(spread, d);
+      let x = lerp(c.hx, c.hx + c.ex + fl*.5, d), y = lerp(c.hy, c.hy + c.ey + fl*.6, d), z = lerp(c.hz, c.hz + c.ez, d);
+      x = lerp(x, c.sx*swarmW + fl*.3, spread); y = lerp(y, c.sy*swarmH + Math.cos(T*.4+c.ph)*.6, spread); z = lerp(z, (c.sz-.5)*10, spread);
+      c.m = m; c.at = toCam(x*u,y*u,z*u); c.depth = c.at[2];
+      c.boost = alive ? Math.exp(-Math.pow(c.f - wave, 2)/1.2)*.32 + Math.exp(-Math.pow(c.f - idle, 2)/1.6)*.14 : 0;
+    }
+    const order = [...this.cubes].sort((a,b) => b.depth - a.depth), half = u*.5;
+    const faces = [[0,1,2,3,[0,0,-1]],[5,4,7,6,[0,0,1]],[4,0,3,7,[-1,0,0]],[1,5,6,2,[1,0,0]],[4,5,1,0,[0,-1,0]],[3,2,6,7,[0,1,0]]];
+    const raw = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+    const dimAll = lerp(1,.62,spread);
+    ctx.lineJoin = "miter";
+    for (const c of order) {
+      const a1 = (T*c.wx + c.rx)*c.m, a2 = (T*c.wy + c.ry)*c.m, ca = Math.cos(a1), sa = Math.sin(a1), cb = Math.cos(a2), sb = Math.sin(a2);
+      const rot = v => { const x1 = v[0]*cb + v[2]*sb, z1 = -v[0]*sb + v[2]*cb, y1 = v[1]*ca - z1*sa, z2 = v[1]*sa + z1*ca; return [x1,y1,z2]; };
+      const size = lerp(half, half*(.75 + (c.i%5)*.14), spread), [px,py,pz] = c.at;
+      const pts = raw.map(v => { const r = rot(v), q = toCam(r[0]*size, r[1]*size, r[2]*size), sc = F*u/(F*u + pz + q[2]); return [cx + (px+q[0])*sc, cy - (py+q[1])*sc]; });
+      const col = [0,1,2].map(j => Math.round(lerp(c.col[j], c.hue[j], spread*.72)));
+      const b = clamp01(c.b + c.boost), scale = F*u/(F*u + pz);
+      /* glow first, so glass sits on light */
+      if (b > .12) { const R = u*(.95 + b*.55)*scale, sp = this.sprites[this.state] || this.sprites.ok, q = (pts[0][0]+pts[6][0])/2, r = (pts[0][1]+pts[6][1])/2;
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = b*.3*dimAll; ctx.drawImage(sp,q-R,r-R,R*2,R*2); ctx.globalCompositeOperation = "source-over"; }
+      for (const [p0,p1,p2,p3,n] of faces) {
+        const nr = toCam(...rot(n)), mid = [(pts[p0][0]+pts[p2][0])/2,(pts[p0][1]+pts[p2][1])/2];
+        const e1 = [pts[p1][0]-pts[p0][0],pts[p1][1]-pts[p0][1]], e2 = [pts[p3][0]-pts[p0][0],pts[p3][1]-pts[p0][1]];
+        if (e1[0]*e2[1]-e1[1]*e2[0] >= 0) continue;  /* screen y runs down, so a face toward the camera winds negative */
+        const shade = .62 + .38*clamp01(.25 - nr[2]*.6 + nr[1]*.35), alpha = c.a*dimAll;
+        const path = (q) => { ctx.beginPath(); [p0,p1,p2,p3].forEach((id,i) => { const X = lerp(pts[id][0],mid[0],q), Y = lerp(pts[id][1],mid[1],q); i ? ctx.lineTo(X,Y) : ctx.moveTo(X,Y); }); ctx.closePath(); };
+        path(0); ctx.fillStyle = `rgba(${col[0]*.14|0},${col[1]*.16|0},${col[2]*.22|0},${Math.min(1,alpha*1.15)})`; ctx.fill();
+        ctx.strokeStyle = `rgba(${col},${alpha*(.3 + b*.65)})`; ctx.lineWidth = 1; ctx.stroke();
+        if (b > .04) { path(.2); const l = Math.min(1,(.42 + b*.95)*shade*alpha*(b > .1 ? 1 : b*10));
+          ctx.fillStyle = `rgba(${Math.min(255,col[0]+30)},${Math.min(255,col[1]+18)},${col[2]},${l})`; ctx.fill(); }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+const tower = new Tower($("tower"));
+function onScroll(){ const hero = document.querySelector(".hero"), e = hero.offsetTop + hero.offsetHeight; tower.scroll = clamp01(scrollY / Math.max(240, e*.8)); if (CALM) tower.draw(); }
+addEventListener("scroll", onScroll, {passive:true});
+
+/* ---------- bot cards ---------- */
+const cards = new Map();
+function makeCard(name, i){
+  const card = el("article","card bot"); card.style.setProperty("--d", (i*.09)+"s");
+  const head = el("div","bothead"); const nm = el("div","name",name); const pill = el("span","pill"); head.append(nm,pill);
+  const scope = el("div","scope"); const canvas = el("canvas"); canvas.setAttribute("aria-hidden","true"); const since = el("span","since"); scope.append(canvas,since);
+  const vit = el("div","vitals"), v = {};
+  for (const [k,lab] of [["balance","Balance"],["net","Net today"],["errors","Errors"]]) {
+    const box = el("div","v"); const s = el("strong",null,"-"), l = el("span","lim",""); box.append(el("small",null,lab),s,l); vit.append(box); v[k] = {box,s,l,val:null};
+  }
+  const crash = el("div","crash"), ci = el("div"), cause = el("div","cause"), log = el("div","log"); ci.append(cause,log); crash.append(ci);
+  const steps = el("div","steps"); const stepEls = ["Trigger","Sent to agent","Bot stopped","Clean-up"].map(t => { const s = el("div","step",t); steps.append(s); return s; });
+  const killbar = el("div","killbar"), conn = el("span","conn"), tags = el("div","tags"); conn.append(el("i"), el("span")); killbar.append(conn,tags);
+  const strip = el("div","strip"), sh = el("div","striphead"); sh.append(el("span",null,"Last 24 hours"), el("span")); const cells = el("div","cells"); cells.setAttribute("aria-hidden","true");
+  const cellEls = []; for (let j = 0; j < 96; j++) { const c = el("i"); cells.append(c); cellEls.push(c); }
+  strip.append(sh,cells);
+  card.append(head,scope,vit,crash,steps,killbar,strip);
+  const o = {card,pill,since,v,crash,cause,log,steps,stepEls,conn,tags,sh,cellEls,logText:null,beatKey:"",scope:null,canvas};
+  return o;
+}
+const money = n => n == null ? "-" : Math.abs(n) >= 1000 ? n.toLocaleString("en-IN",{maximumFractionDigits:2}) : (+n.toFixed(2)).toString();
+function animateNum(slot, to, fmt){
+  if (to == null || slot.val == null || CALM || slot.val === to) { slot.val = to; slot.s.textContent = fmt(to); return; }
+  const from = slot.val, start = performance.now(); slot.val = to;
+  const step = t => { const p = Math.min(1,(t-start)/650), e = 1-Math.pow(1-p,3); if (slot.val !== to) return; slot.s.textContent = fmt(from+(to-from)*e); if (p<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+const span = s => s == null ? "" : s < 60 ? Math.round(s)+"s" : s < 3600 ? Math.round(s/60)+"m" : Math.round(s/3600)+"h";
+function paintCard(o, b){
+  o.card.dataset.state = b.state; o.pill.textContent = LABEL[b.state] || b.state;
+  o.scope.set(b.state, b.age, b.timeout);
+  o.since.textContent = b.age == null ? "no ping yet" : "last ping " + span(b.age) + " ago";
+  const {balance:B, net:N, errors:E} = o.v;
+  animateNum(B,b.balance,money); B.l.textContent = b.floor == null ? "no floor set" : "floor " + money(b.floor); B.box.toggleAttribute("data-bad", b.alerts.funds);
+  animateNum(N,b.net,n => n == null ? "-" : (n > 0 ? "+" : "") + money(n)); N.l.textContent = b.loss_limit == null ? "no limit set" : "limit -" + money(b.loss_limit); N.box.toggleAttribute("data-bad", b.alerts.loss);
+  animateNum(E,b.errors,n => n == null ? "-" : String(Math.round(n))); E.l.textContent = b.max_errors == null ? "no limit set" : "limit " + b.max_errors; E.box.toggleAttribute("data-bad", b.alerts.fail);
+
+  /* crash report: shown while the bot is down, or just stopped */
+  const showCrash = !!b.log && (b.state === "down" || b.state === "killing" || b.state === "halted");
+  o.crash.toggleAttribute("data-on", showCrash);
+  if (showCrash && o.logText !== b.log) {
+    o.logText = b.log; o.cause.replaceChildren(el("span",null,"Likely cause"), document.createTextNode(b.cause || "Not clear from the log. The last lines are below."));
+    o.log.replaceChildren(...b.log.split("\n").map((l,i) => { const d = el("div",null,l || " "); d.style.animationDelay = (i*55)+"ms"; return d; }));
+    o.log.scrollTop = o.log.scrollHeight;
+  }
+  if (!showCrash) o.logText = null;
+
+  /* kill sequence */
+  const killing = b.state === "killing", halted = b.state === "halted";
+  o.steps.toggleAttribute("data-on", killing || halted);
+  const c = b.kill.cleanup, stage = killing ? 1 : halted ? 3 : 0;
+  o.stepEls.forEach((s,i) => { s.dataset.s = i < stage ? "on" : i === stage && killing ? "now" : ""; });
+  if (halted) o.stepEls[3].dataset.s = c === "failed" ? "bad" : c === "ok" ? "on" : "";
+  o.stepEls[3].textContent = !halted ? "Clean-up" : c === "failed" ? "Clean-up failed" : c === "ok" ? "Clean-up ran" : "No clean-up set";
+
+  o.conn.toggleAttribute("data-on", b.kill.agent); o.conn.lastChild.textContent = b.kill.agent ? "Agent connected" : "Agent not connected";
+  o.tags.replaceChildren(...(b.kill.on.length ? [el("span",null,"Auto-stop on"), ...b.kill.on.map(w => el("span","tag",w))] : [el("span",null,"Auto-stop off")]));
+
+  const key = b.beats.join();
+  if (key !== o.beatKey) { o.beatKey = key;
+    let up = 0, known = 0;
+    b.beats.forEach((n,i) => { const c = o.cellEls[i]; c.className = n > 0 ? "on" : n === 0 ? "off" : ""; if (n >= 0) { known++; if (n > 0) up++; } });
+    o.sh.lastChild.textContent = known ? Math.round(up/known*100) + "% of 15-min blocks pinged" : "";
+  }
+}
+
+/* ---------- page state ---------- */
+const seen = new Set(); let firstEvents = true;
+const KIND = {a_stop:"bad",a_funds:"warn",a_fail:"warn",a_loss:"bad",ok:"ok",kill_sent:"kill",kill_done:"kill",kill_failed:"bad"};
+const when = (at, now) => { const s = now - at; return s < 60 ? "just now" : s < 3600 ? Math.floor(s/60)+" min ago" : s < 86400 ? Math.floor(s/3600)+" hours ago" : new Date(at*1000).toLocaleDateString(undefined,{day:"numeric",month:"short"}); };
+function paintEvents(evs, now){
+  const box = $("events");
+  if (!evs.length) { if (!box.querySelector(".none")) box.replaceChildren(el("div","none", DEMO ? "Press a button below to see an alert land here." : "All quiet. Alerts will appear here as they're sent.")); $("evcount").textContent = ""; return; }
+  box.querySelector(".none")?.remove();
+  for (const e of [...evs].reverse()) {
+    const key = e.at + "|" + e.bot + "|" + e.kind;
+    if (seen.has(key)) continue; seen.add(key);
+    const n = el("div","ev",e.text); n.dataset.k = KIND[e.kind] || "ok"; const t = el("time"); t.dataset.at = e.at; n.append(t);
+    if (firstEvents) n.style.animation = "none";
+    box.prepend(n);
+  }
+  firstEvents = false;
+  while (box.children.length > 30) box.lastChild.remove();
+  box.querySelectorAll("time").forEach(t => t.textContent = when(+t.dataset.at, now));
+  $("evcount").textContent = evs.length;
+}
+let picked = null, lastPing = {};
+const RANK = {down:5,killing:5,warn:4,halted:3,ok:2,paused:1,waiting:0};
+function paintTower(d){
+  const box = $("watch"), legend = $("legend");
+  if (picked && !d.bots.some(b => b.name === picked)) picked = null;
+  const worst = [...d.bots].sort((a,b) => (RANK[b.state]||0) - (RANK[a.state]||0))[0];
+  const b = d.bots.find(x => x.name === picked) || worst;
+  if (!b) { tower.set(new Array(96).fill(-1),"waiting"); box.replaceChildren(); legend.textContent = ""; return; }
+  tower.set(b.beats,b.state);
+  if (lastPing[b.name] !== b.last_ping) { if (lastPing[b.name]) tower.pulse(); lastPing[b.name] = b.last_ping; }
+  const sig = d.bots.map(x => x.name).join("|") + "#" + b.name;
+  if (box.dataset.sig !== sig) { box.dataset.sig = sig;
+    box.replaceChildren(...(d.bots.length < 2 ? [] : d.bots.map(x => { const t = el("button",null,x.name); t.setAttribute("aria-pressed",x.name === b.name); t.onclick = () => { picked = x.name; paintTower(d); if (CALM) tower.draw(); }; return t; }))); }
+  legend.textContent = `The tower is ${b.name}'s last 24 hours. Each block is 15 minutes, with now at the top. Red blocks had no ping.`;
+}
+function paint(d){
+  const host = $("bots"), names = new Set(d.bots.map(b => b.name));
+  for (const [n,o] of cards) if (!names.has(n)) { o.card.remove(); scopes.delete(o.scope); cards.delete(n); }
+  host.querySelector(".empty")?.remove();
+  d.bots.forEach((b,i) => {
+    let o = cards.get(b.name);
+    if (!o) { o = makeCard(b.name,i); host.append(o.card); o.scope = new Scope(o.canvas); scopes.add(o.scope); cards.set(b.name,o); }
+    paintCard(o,b);
+  });
+  if (!d.bots.length) {
+    const e = el("div","card empty"); e.append(el("h2",null,"Nothing to watch yet"), (() => { const p = el("p",null,"Send "); p.append(el("code",null,"/newbot mybot"), document.createTextNode(" to your Flatline Telegram bot and it will appear here.")); return p; })()); host.append(e);
+  }
+  paintEvents(d.events, d.now);
+  paintTower(d);
+
+  const by = s => d.bots.filter(b => b.state === s), down = by("down").concat(by("killing")), warn = by("warn"), alive = by("ok"), halted = by("halted");
+  const mood = down.length ? "down" : warn.length ? "warn" : (!alive.length && halted.length) ? "calm" : "ok";
+  document.body.dataset.mood = mood;
+  const head = $("headline"), sub = $("sub"), name = bs => bs[0].name.length > 18 ? bs[0].name.slice(0,17)+"…" : bs[0].name;
+  let h, t;
+  if (!d.bots.length) { h = ["Ready when ","you are."]; t = "Your bots will show up here as soon as you add them."; }
+  else if (down.length) { h = [name(down) + (down.length > 1 ? ` and ${down.length-1} more ` : " "), "needs you."]; t = "Your Telegram alert has been sent. The likely cause is on the card below."; }
+  else if (warn.length) { h = [name(warn) + " is alive but ","hurting."]; t = "It's still pinging, but one of your limits has been crossed."; }
+  else if (alive.length) { h = [alive.length === 1 ? "Your bot is " : "All bots are ","alive."]; t = "Watching every ping. If one stops, you'll hear about it on Telegram."; }
+  else if (halted.length) { h = ["Stopped, ","as you asked."]; t = "Alerts resume when a bot pings again. Check your exchange for any open positions."; }
+  else { h = ["Waiting for a ","first ping."]; t = "Once your bot pings, its trace starts here."; }
+  const sig = h.join("|");
+  if (head.dataset.sig !== sig) { head.dataset.sig = sig; head.replaceChildren(document.createTextNode(h[0]), el("em",null,h[1])); }
+  sub.textContent = DEMO ? "This is a simulation, with a made-up bot and numbers. Press the buttons to see what happens when a bot fails." : t;
+
+  const tally = $("tally"); tally.replaceChildren();
+  const stat = (v,l) => { const w = el("div"); w.append(el("b",null,v),document.createTextNode(l)); tally.append(w); };
+  if (!DEMO) stat(`${alive.length + warn.length}/${d.bots.length}`, "alive");
+  document.title = (down.length ? "⚠ " : "") + "Flatline Monitor";
+}
+function setLink(text, bad){ $("link").toggleAttribute("data-bad", !!bad); $("linktext").textContent = text; }
+
+/* ---------- the render loop ---------- */
+const scopes = new Set(); let lastT = 0;
+function frame(t){
+  const dt = Math.min(.1, (t - lastT) / 1000 || 0); lastT = t;
+  if (dt > 0) { for (const s of scopes) s.tick(dt); tower.frame(dt); }
+  requestAnimationFrame(frame);
+}
+if (!CALM) requestAnimationFrame(frame);
+addEventListener("resize", () => { for (const s of scopes) s.fit(); tower.fit(); onScroll(); });
+
+/* ---------- live data ---------- */
+let lastGood = 0, lastData = null;
+async function pull(){
+  try {
+    const r = await fetch(DATA_URL, {cache:"no-store"});
+    if (!r.ok) throw new Error(r.status);
+    lastData = await r.json(); lastGood = Date.now();
+    $("banner").removeAttribute("data-on");
+    paint(lastData);
+    if (CALM) { for (const s of scopes) s.still(); tower.frame(.0001); tower.cubes.forEach(c => { const [col,b,a] = tower.look(c); c.col = [...col]; c.b = b; c.a = a; }); tower.draw(); }
+  } catch (e) { /* reported below, so old numbers never look current */ }
+  const late = lastGood ? (Date.now() - lastGood) / 1000 : 99;
+  if (late > 20) {
+    setLink("Offline", true);
+    const b = $("banner"); b.textContent = "Can't reach Flatline right now, so this page may be out of date. Your Telegram alerts are separate."; b.setAttribute("data-on","");
+    for (const o of cards.values()) o.scope.set("paused");
+  } else setLink("Live");
+}
+
+/* ---------- the simulation behind /demo. Nothing here touches a real bot. ---------- */
+const sim = {
+  now(){ return Date.now()/1000; }, events:[], timers:[],
+  beats(){ const out = []; for (let i = 0; i < 96; i++) out.push(i < 8 ? -1 : (i === 41 || i === 42) ? 0 : 7); return out; },
+  fresh(){ return {name:"demo-bot", state:"ok", ping:this.now(), timeout:60, balance:1248.5, errors:0, net:18.4, floor:200, max_errors:5, loss_limit:50, alerts:{stop:false,funds:false,fail:false,loss:false}, on:["loss","stop"], cleanup:null, log:null, cause:null, frozen:false}; },
+  later(ms,f){ this.timers.push(setTimeout(f, CALM ? 0 : ms)); },
+  clear(){ this.timers.forEach(clearTimeout); this.timers = []; },
+  say(kind,text){ this.events.unshift({bot:"demo-bot",kind,text,at:this.now()+Math.random()/1000}); this.show(); },
+  show(){ const b = this.b; const alive = b.state === "ok" || b.state === "warn";
+    if (alive) b.ping = this.now();
+    paint({now:this.now(),events:this.events,bots:[{name:b.name,state:b.state,age:alive?2:this.now()-b.ping,timeout:b.timeout,balance:b.balance,errors:b.errors,net:b.net,floor:b.floor,max_errors:b.max_errors,loss_limit:b.loss_limit,alerts:b.alerts,beats:this.beats(),kill:{on:b.on,agent:b.state!=="halted"&&!b.gone,reason:null,cleanup:b.cleanup},log:b.log,cause:b.cause}]}); if (CALM) { for (const s of scopes) s.still(); tower.cubes.forEach(c => { const [col,bb,a] = tower.look(c); c.col = [...col]; c.b = bb; c.a = a; c.dis = b.state === "down" ? 1 : 0; }); tower.draw(); } },
+  killSeq(reason){ const b = this.b; b.state = "killing"; this.say("kill_sent",`KILL SWITCH sent to demo-bot. Reason: ${reason}. Waiting for its agent to confirm.`);
+    this.later(2300,()=>{ b.state="halted"; b.cleanup="ok"; b.alerts.stop=false; this.say("kill_done","KILL SWITCH confirmed: demo-bot has stopped. Your clean-up command ran. Open positions and orders stay as they are unless your clean-up closed them, so check your exchange."); }); },
+  act(a){ const b = this.b;
+    if (a === "reset") { this.clear(); this.b = this.fresh(); if (b.state !== "ok") this.say("ok","demo-bot is back. Pings have resumed."); this.show(); return; }
+    if (b.state !== "ok" && b.state !== "warn") return;
+    this.clear();
+    if (a === "crash") { b.state="down"; b.gone=true; b.alerts.stop=true;
+      b.cause="The exchange or RPC is rate limiting the bot.";
+      b.log="[12:04:11] order filled BTCUSDT\n[12:04:26] fetching order book\n[12:04:27] HTTP status 429 from exchange\n[12:04:27] retry 3 of 3 failed\nccxt.RateLimitExceeded: too many requests";
+      this.say("a_stop","demo-bot crashed. Exit code 1."); }
+    if (a === "freeze") { b.state="down"; b.alerts.stop=true;
+      b.cause="A network, exchange or RPC connection failed.";
+      b.log="[12:09:02] placing order\n[12:09:03] waiting for fill\n[12:09:33] connection timed out, retrying";
+      this.say("a_stop","demo-bot froze. Its process is still running, but it has stopped producing output.");
+      this.later(1500,()=>this.killSeq("demo-bot froze")); }
+    if (a === "loss") { b.state="warn"; b.alerts.loss=true; b.net=-62.3; b.balance=1167.8; b.errors=2;
+      this.say("a_loss","demo-bot: loss limit crossed. Net today -62.3, your limit is -50.");
+      this.later(1800,()=>{ b.log="[12:15:40] stop-loss filled at market\n[12:15:41] net today -62.30"; b.cause="Your loss limit was crossed."; this.killSeq("demo-bot: loss limit crossed"); }); }
+    if (a === "kill") { b.log="[12:20:01] heartbeat ok\n[12:20:16] heartbeat ok\n[12:20:18] received stop signal"; b.cause="You pressed the kill switch."; this.killSeq("you sent /kill"); }
+    this.show();
+  },
+  start(){ this.b = this.fresh(); this.show(); setLink("Demo"); $("link").querySelector(".dot").style.animation = "none";
+    $("console").setAttribute("data-on",""); $("feedtitle").textContent = "What Telegram would show";
+    $("demofoot").textContent = "Simulated demo. No real bot, money or results. Flatline can't trade or move funds. Alerts aren't guaranteed, so don't rely on them as your only safeguard.";
+    $("console").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { touched = true; this.act(b.dataset.act); } });
+    /* play once by itself so the page explains itself to someone who only watches */
+    let touched = false;
+    setTimeout(() => { if (!touched) this.act("crash"); }, 6000);
+    setTimeout(() => { if (!touched) this.act("reset"); }, 14000);
+  }
+};
+
+if (DEMO) sim.start();
+else {
+  $("foot").textContent = "Private page. Anyone with this link can view it. Log lines have keys hidden on a best-effort basis.";
+  pull(); setInterval(pull, 5000);
+  setInterval(() => { if (!lastData) return; /* age counts up between refreshes */
+    const late = (Date.now() - lastGood) / 1000; if (late > 20) return;
+    for (const b of lastData.bots) { const o = cards.get(b.name); if (o && b.age != null) { const a = b.age + late; o.since.textContent = "last ping " + span(a) + " ago"; if (b.state === "ok" || b.state === "warn") o.scope.set(b.state, a, b.timeout); } }
+  }, 1000);
+}
+</script>
+</body>
+</html>
