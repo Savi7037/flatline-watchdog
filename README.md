@@ -12,6 +12,7 @@ This repository holds promo files only. It doesn't contain the product's code.
 | --- | --- |
 | [`flatline-promo-short.mp4`](flatline-promo-short.mp4) | 19.7-second vertical promo |
 | [`flatline-promo.mp4`](flatline-promo.mp4) | 55-second vertical promo |
+| [`flatline-setup-tutorial.mp4`](flatline-setup-tutorial.mp4) | 2-minute setup tutorial |
 | [`flatline-avatar.png`](flatline-avatar.png) | Profile picture, 1024×1024 |
 
 The alerts and numbers shown in the videos are simulated. Flatline Watchdog is monitoring only and isn't financial advice.
